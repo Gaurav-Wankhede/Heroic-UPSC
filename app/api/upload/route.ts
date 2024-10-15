@@ -1,12 +1,20 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { writeFile, mkdir } from 'fs/promises';
 import { join } from 'path';
-import { existsSync } from 'fs';
+import { existsSync, readFileSync, writeFileSync } from 'fs';
 import slugify from 'slugify';
-import postManager from '@/lib/postManager';
-import { readDb } from '../posts/route';
 
 const assetsDir = join(process.cwd(), 'public', 'data', 'assets');
+const dbPath = join(process.cwd(), 'db.json');
+
+function readDb() {
+  const data = readFileSync(dbPath, 'utf8');
+  return JSON.parse(data);
+}
+
+function writeDb(data: any) {
+  writeFileSync(dbPath, JSON.stringify(data, null, 2));
+}
 
 function generateSlug(title: string, category: string, posts: any[]): string {
   const baseSlug = slugify(title, { lower: true, strict: true });
@@ -58,7 +66,8 @@ export async function POST(req: NextRequest) {
     };
 
     // Add new post to the array
-    postManager.addPost(newPost);
+    db.posts.push(newPost);
+    writeDb(db);
 
     return NextResponse.json({ success: true, data: newPost });
   } catch (error) {
