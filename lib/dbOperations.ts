@@ -60,12 +60,20 @@ async function syncDbToJson() {
 }
 
 export async function getPosts(category?: string) {
-  await syncJsonToDb();
-  const db = await openDb();
-  if (category) {
-    return db.all('SELECT * FROM posts WHERE category = ? ORDER BY date DESC', category);
+  try {
+    await syncJsonToDb();
+    const db = await openDb();
+    let posts;
+    if (category) {
+      posts = await db.all('SELECT * FROM posts WHERE category = ? ORDER BY date DESC', category);
+    } else {
+      posts = await db.all('SELECT * FROM posts ORDER BY date DESC');
+    }
+    return posts || [];
+  } catch (error) {
+    console.error('Error fetching posts:', error);
+    return [];
   }
-  return db.all('SELECT * FROM posts ORDER BY date DESC');
 }
 
 export async function createPost(post: any) {
@@ -100,4 +108,3 @@ export async function deletePost(id: string) {
   await db.run('DELETE FROM posts WHERE id = ?', id);
   await syncDbToJson();
 }
-

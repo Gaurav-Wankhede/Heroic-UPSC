@@ -8,7 +8,11 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
     const category = searchParams.get('category');
     const posts = await getPosts(category || undefined);
-    return NextResponse.json(posts);
+    
+    // Ensure posts is always an array
+    const safePostsArray = Array.isArray(posts) ? posts : [];
+    
+    return NextResponse.json(safePostsArray);
   } catch (error) {
     console.error('Error fetching posts:', error);
     return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });

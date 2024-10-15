@@ -72,9 +72,18 @@ export default function Dashboard() {
   const fetchPosts = async () => {
     try {
       const response = await fetch('/api/posts');
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
       const data = await response.json();
-      setPosts(data);
-      setFilteredPosts(data);
+      if (Array.isArray(data)) {
+        setPosts(data);
+        setFilteredPosts(data);
+      } else {
+        console.error('Received non-array data:', data);
+        setPosts([]);
+        setFilteredPosts([]);
+      }
     } catch (error) {
       console.error('Error fetching posts:', error);
       toast({
@@ -82,6 +91,8 @@ export default function Dashboard() {
         description: "Failed to fetch posts. Please try again.",
         variant: "destructive",
       });
+      setPosts([]);
+      setFilteredPosts([]);
     }
   };
 
