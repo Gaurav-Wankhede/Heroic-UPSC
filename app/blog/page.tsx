@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import Link from "next/link";
 import { categories } from '@/lib/categories';
@@ -23,11 +23,11 @@ export default function BlogPage() {
   const [currentPage, setCurrentPage] = useState(1);
   const postsPerPage = 6;
 
-  useEffect(() => {
+  React.useEffect(() => {
     async function fetchPosts() {
       const response = await fetch('/api/posts?category=Blog');
       const posts = await response.json();
-      setAllRecentPosts(posts);
+      setAllRecentPosts(posts.sort((a: Post, b: Post) => new Date(b.date).getTime() - new Date(a.date).getTime()));
     }
     fetchPosts();
   }, []);
@@ -55,7 +55,7 @@ export default function BlogPage() {
       <section className="mb-12">
         <h2 className="text-2xl font-semibold mb-4">Blog Categories</h2>
         <ul className="list-disc pl-5 space-y-2">
-          {blogCategory && blogCategory.subcategories && blogCategory.subcategories.map((subcat, index) => (
+          {blogCategory?.subcategories?.map((subcat, index) => (
             <li key={index}>{typeof subcat === 'string' ? subcat : subcat.name}</li>
           ))}
         </ul>
