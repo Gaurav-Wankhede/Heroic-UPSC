@@ -6,7 +6,7 @@ import slugify from 'slugify';
 
 const dbPath = path.join(process.cwd(), 'db.json');
 
-export function readDb() {
+function readDb() {
   const data = fs.readFileSync(dbPath, 'utf8');
   return JSON.parse(data);
 }
@@ -28,10 +28,18 @@ function generateSlug(title: string, category: string, posts: any[]): string {
   return slug;
 }
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
+    const { searchParams } = new URL(request.url);
+    const category = searchParams.get('category');
     const db = readDb();
-    return NextResponse.json(db.posts);
+    let posts = db.posts;
+    
+    if (category) {
+      posts = posts.filter((post: any) => post.category === category);
+    }
+    
+    return NextResponse.json(posts);
   } catch (error) {
     console.error('Error reading posts:', error);
     return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
