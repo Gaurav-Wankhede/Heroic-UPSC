@@ -27,7 +27,7 @@ export default function InterviewPage() {
     async function fetchPosts() {
       const response = await fetch('/api/posts?category=Interview');
       const posts = await response.json();
-      setAllRecentPosts(posts);
+      setAllRecentPosts(posts.sort((a: Post, b: Post) => new Date(b.date).getTime() - new Date(a.date).getTime()));
     }
     fetchPosts();
   }, []);

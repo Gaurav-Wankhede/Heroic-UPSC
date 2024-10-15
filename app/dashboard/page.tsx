@@ -26,6 +26,7 @@ interface Post {
   subSubcategory: string;
   date: string;
   images?: { url: string }[];
+  slug: string;
 }
 
 const categoryStructure = categories.reduce((acc: { [key: string]: any }, category) => {
@@ -55,6 +56,7 @@ export default function Dashboard() {
   const { register, handleSubmit, setValue, reset, control, watch } = useForm<FieldValues>()
   const [currentPage, setCurrentPage] = useState(1)
   const postsPerPage = 3
+  const [editingPost, setEditingPost] = useState<Post | null>(null)
 
   const watchCategory = watch('category')
   const watchSubcategory = watch('subcategory')
@@ -69,33 +71,36 @@ export default function Dashboard() {
 
   const fetchPosts = async () => {
     try {
-      const response = await fetch('/api/posts')
-      if (response.ok) {
-        const data = await response.json()
-        const sortedPosts = data.sort((a: Post, b: Post) => new Date(b.date).getTime() - new Date(a.date).getTime())
-        setPosts(sortedPosts)
-        setFilteredPosts(sortedPosts)
-      }
+      const response = await fetch('/api/posts');
+      const data = await response.json();
+      setPosts(data);
+      setFilteredPosts(data);
     } catch (error) {
-      console.error('Error fetching posts:', error)
+      console.error('Error fetching posts:', error);
+      toast({
+        title: "Error",
+        description: "Failed to fetch posts. Please try again.",
+        variant: "destructive",
+      });
     }
-  }
+  };
 
   const onSubmit = async (data: FieldValues) => {
     try {
       const postData = {
-        id: data.id, // Add this line to include the id when editing
+        id: data.id,
         title: data.title,
         content: data.content,
         category: data.category,
         subcategory: data.subcategory,
         subSubcategory: data.subSubcategory,
-        date: data.id ? data.date : new Date().toISOString(), // Keep original date when editing
-        images: data.images ? [{ url: URL.createObjectURL(data.images[0]) }] : []
+        date: data.id ? data.date : new Date().toISOString(),
       };
 
+      const url = data.id ? '/api/posts' : '/api/posts';
       const method = data.id ? 'PUT' : 'POST';
-      const response = await fetch('/api/posts', {
+
+      const response = await fetch(url, {
         method: method,
         headers: {
           'Content-Type': 'application/json',
@@ -104,7 +109,7 @@ export default function Dashboard() {
       });
 
       if (!response.ok) {
-        throw new Error(`Failed to ${data.id ? 'update' : 'create'} post`);
+        throw new Error(`HTTP error! status: ${response.status}`);
       }
 
       await fetchPosts();
@@ -114,6 +119,7 @@ export default function Dashboard() {
         description: `Post ${data.id ? 'updated' : 'created'} successfully`,
       });
       reset();
+      setEditingPost(null);
     } catch (error) {
       console.error(`Error ${data.id ? 'updating' : 'creating'} post:`, error);
       toast({
@@ -134,30 +140,31 @@ export default function Dashboard() {
       try {
         const response = await fetch(`/api/posts?id=${postToDelete}`, {
           method: 'DELETE',
-        })
-        if (response.ok) {
-          setPosts(posts.filter(post => post.id !== postToDelete))
-          setFilteredPosts(filteredPosts.filter(post => post.id !== postToDelete))
-          toast({
-            title: "Success",
-            description: "Post deleted successfully",
-          })
-        } else {
-          throw new Error('Failed to delete post')
+        });
+
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
         }
+
+        setPosts(posts.filter(post => post.id !== postToDelete));
+        setFilteredPosts(filteredPosts.filter(post => post.id !== postToDelete));
+        toast({
+          title: "Success",
+          description: "Post deleted successfully",
+        });
       } catch (error) {
-        console.error('Error deleting post:', error)
+        console.error('Error deleting post:', error);
         toast({
           title: "Error",
           description: "Failed to delete post. Please try again.",
           variant: "destructive",
-        })
+        });
       } finally {
-        setPostToDelete(null)
-        setConfirmText('')
+        setPostToDelete(null);
+        setConfirmText('');
       }
     }
-  }
+  };
 
   const parseDate = (dateString: string): Date | null => {
     const formats = ['dd-MMMM-yyyy', 'dd-MMM-yyyy', 'dd-MM-yyyy', 'd-M-yyyy', 'yyyy', 'MMMM-yyyy', 'MMM-yyyy', 'dd', 'DD', 'MM', 'MMM', 'MMMM'];
@@ -235,12 +242,14 @@ export default function Dashboard() {
   const handleEditClick = (id: string) => {
     const postToEdit = posts.find(post => post.id === id);
     if (postToEdit) {
+      setEditingPost(postToEdit);
+      setValue('id', postToEdit.id);
       setValue('title', postToEdit.title);
       setValue('content', postToEdit.content);
       setValue('category', postToEdit.category);
       setValue('subcategory', postToEdit.subcategory);
       setValue('subSubcategory', postToEdit.subSubcategory);
-      // Set other fields as necessary
+      setValue('date', postToEdit.date);
     }
   }
 
@@ -253,71 +262,144 @@ export default function Dashboard() {
   const currentPosts = filteredPosts.slice(indexOfFirstPost, indexOfLastPost);
 
   const paginate = (pageNumber: number) => setCurrentPage(pageNumber);
+
   return (
     <div className="container mx-auto p-4">
       <div className="flex justify-between items-center mb-4">
         <h1 className="text-3xl font-bold">Dashboard</h1>
         <UserButton afterSignOutUrl="/" />
       </div>
-      <form onSubmit={handleSubmit(onSubmit)} className="mb-8">
-        <Input {...register('title', { required: true })} placeholder="Title" className="mb-4" />
-        <Controller
-          name="content"
-          control={control}
-          rules={{ required: true }}
-          render={({ field }) => <RichTextEditor {...field} />}
-        />
-        <Select onValueChange={(value) => {
-          setValue('category', value)
-          setValue('subcategory', '')
-          setValue('subSubcategory', '')
-        }}>
-          <SelectTrigger className="mb-4">
-            <SelectValue placeholder="Select category" />
-          </SelectTrigger>
-          <SelectContent>
-            {Object.keys(categoryStructure).map((category) => (
-              <SelectItem key={category} value={category}>
-                {category}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        {watchCategory && typeof categoryStructure[watchCategory as keyof typeof categoryStructure] === 'object' && Object.keys(categoryStructure[watchCategory as keyof typeof categoryStructure]).length > 0 && (
+
+      {/* Create Post Section */}
+      <section className="mb-8">
+        <h2 className="text-2xl font-bold mb-4">Create Post</h2>
+        <form onSubmit={handleSubmit(onSubmit)}>
+          <Input {...register('title', { required: true })} placeholder="Title" className="mb-4" />
+          <Controller
+            name="content"
+            control={control}
+            rules={{ required: true }}
+            render={({ field }) => <RichTextEditor {...field} />}
+          />
           <Select onValueChange={(value) => {
-            setValue('subcategory', value)
+            setValue('category', value)
+            setValue('subcategory', '')
             setValue('subSubcategory', '')
           }}>
             <SelectTrigger className="mb-4">
-              <SelectValue placeholder="Select subcategory" />
+              <SelectValue placeholder="Select category" />
             </SelectTrigger>
             <SelectContent>
-              {Object.keys(categoryStructure[watchCategory as keyof typeof categoryStructure]).map((subcategory) => (
-                <SelectItem key={subcategory} value={subcategory}>
-                  {subcategory}
+              {Object.keys(categoryStructure).map((category) => (
+                <SelectItem key={category} value={category}>
+                  {category}
                 </SelectItem>
               ))}
             </SelectContent>
           </Select>
-        )}
-        {watchCategory && watchSubcategory && categoryStructure[watchCategory as keyof typeof categoryStructure][watchSubcategory as keyof (typeof categoryStructure)[keyof typeof categoryStructure]] && (
-          <Select onValueChange={(value) => setValue('subSubcategory', value)}>
-            <SelectTrigger className="mb-4">
-              <SelectValue placeholder="Select sub-subcategory" />
-            </SelectTrigger>
-            <SelectContent>
-              {Array.isArray(categoryStructure[watchCategory as keyof typeof categoryStructure][watchSubcategory as keyof (typeof categoryStructure)[keyof typeof categoryStructure]]) &&
-                (categoryStructure[watchCategory as keyof typeof categoryStructure][watchSubcategory as keyof (typeof categoryStructure)[keyof typeof categoryStructure]] as string[]).map((subSubcategory: string) => (
-                  <SelectItem key={subSubcategory} value={subSubcategory}>
-                    {subSubcategory}
+          {watchCategory && typeof categoryStructure[watchCategory as keyof typeof categoryStructure] === 'object' && Object.keys(categoryStructure[watchCategory as keyof typeof categoryStructure]).length > 0 && (
+            <Select onValueChange={(value) => {
+              setValue('subcategory', value)
+              setValue('subSubcategory', '')
+            }}>
+              <SelectTrigger className="mb-4">
+                <SelectValue placeholder="Select subcategory" />
+              </SelectTrigger>
+              <SelectContent>
+                {Object.keys(categoryStructure[watchCategory as keyof typeof categoryStructure]).map((subcategory) => (
+                  <SelectItem key={subcategory} value={subcategory}>
+                    {subcategory}
                   </SelectItem>
                 ))}
-            </SelectContent>
-          </Select>
-        )}
-        <Input {...register('image')} type="file" accept="image/*" className="mb-4" />
-        <Button type="submit">Create Post</Button>
-      </form>
+              </SelectContent>
+            </Select>
+          )}
+          {watchCategory && watchSubcategory && categoryStructure[watchCategory as keyof typeof categoryStructure][watchSubcategory as keyof (typeof categoryStructure)[keyof typeof categoryStructure]] && (
+            <Select onValueChange={(value) => setValue('subSubcategory', value)}>
+              <SelectTrigger className="mb-4">
+                <SelectValue placeholder="Select sub-subcategory" />
+              </SelectTrigger>
+              <SelectContent>
+                {Array.isArray(categoryStructure[watchCategory as keyof typeof categoryStructure][watchSubcategory as keyof (typeof categoryStructure)[keyof typeof categoryStructure]]) &&
+                  (categoryStructure[watchCategory as keyof typeof categoryStructure][watchSubcategory as keyof (typeof categoryStructure)[keyof typeof categoryStructure]] as string[]).map((subSubcategory: string) => (
+                    <SelectItem key={subSubcategory} value={subSubcategory}>
+                      {subSubcategory}
+                    </SelectItem>
+                  ))}
+              </SelectContent>
+            </Select>
+          )}
+          <Input {...register('images')} type="file" accept="image/*" className="mb-4" />
+          <Button type="submit">Create Post</Button>
+        </form>
+      </section>
+
+      {/* Edit Post Section */}
+      {editingPost && (
+        <section className="mb-8">
+          <h2 className="text-2xl font-bold mb-4">Edit Post</h2>
+          <form onSubmit={handleSubmit(onSubmit)}>
+            <Input {...register('title', { required: true })} placeholder="Title" className="mb-4" />
+            <Controller
+              name="content"
+              control={control}
+              rules={{ required: true }}
+              render={({ field }) => <RichTextEditor {...field} />}
+            />
+            <Select onValueChange={(value) => {
+              setValue('category', value)
+              setValue('subcategory', '')
+              setValue('subSubcategory', '')
+            }}>
+              <SelectTrigger className="mb-4">
+                <SelectValue placeholder="Select category" />
+              </SelectTrigger>
+              <SelectContent>
+                {Object.keys(categoryStructure).map((category) => (
+                  <SelectItem key={category} value={category}>
+                    {category}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {watchCategory && typeof categoryStructure[watchCategory as keyof typeof categoryStructure] === 'object' && Object.keys(categoryStructure[watchCategory as keyof typeof categoryStructure]).length > 0 && (
+              <Select onValueChange={(value) => {
+                setValue('subcategory', value)
+                setValue('subSubcategory', '')
+              }}>
+                <SelectTrigger className="mb-4">
+                  <SelectValue placeholder="Select subcategory" />
+                </SelectTrigger>
+                <SelectContent>
+                  {Object.keys(categoryStructure[watchCategory as keyof typeof categoryStructure]).map((subcategory) => (
+                    <SelectItem key={subcategory} value={subcategory}>
+                      {subcategory}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
+            {watchCategory && watchSubcategory && categoryStructure[watchCategory as keyof typeof categoryStructure][watchSubcategory as keyof (typeof categoryStructure)[keyof typeof categoryStructure]] && (
+              <Select onValueChange={(value) => setValue('subSubcategory', value)}>
+                <SelectTrigger className="mb-4">
+                  <SelectValue placeholder="Select sub-subcategory" />
+                </SelectTrigger>
+                <SelectContent>
+                  {Array.isArray(categoryStructure[watchCategory as keyof typeof categoryStructure][watchSubcategory as keyof (typeof categoryStructure)[keyof typeof categoryStructure]]) &&
+                    (categoryStructure[watchCategory as keyof typeof categoryStructure][watchSubcategory as keyof (typeof categoryStructure)[keyof typeof categoryStructure]] as string[]).map((subSubcategory: string) => (
+                      <SelectItem key={subSubcategory} value={subSubcategory}>
+                        {subSubcategory}
+                      </SelectItem>
+                    ))}
+                </SelectContent>
+              </Select>
+            )}
+            <Input {...register('images')} type="file" accept="image/*" className="mb-4" />
+            <Button type="submit">Update Post</Button>
+            <Button type="button" onClick={() => setEditingPost(null)} className="ml-2">Cancel Edit</Button>
+          </form>
+        </section>
+      )}
 
       <div>
         <h2 className="text-2xl font-bold mb-4">Posts</h2>
@@ -399,6 +481,7 @@ export default function Dashboard() {
                 {post.images && post.images.length > 0 && (
                   <Image src={post.images[0].url} alt={post.title} width={500} height={300} className="mt-2 max-w-full h-auto" />
                 )}
+                <Button onClick={() => handleEditClick(post.id)} className="mt-4 mr-2">Edit</Button>
                 <AlertDialog>
                   <AlertDialogTrigger asChild>
                     <Button variant="destructive" className="mt-4" onClick={() => handleDeleteClick(post.id)}>Delete</Button>

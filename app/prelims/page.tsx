@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import Link from "next/link";
 import { categories } from '@/lib/categories';
@@ -23,7 +23,7 @@ export default function PrelimsPage() {
   const [currentPage, setCurrentPage] = useState(1);
   const postsPerPage = 6;
 
-  React.useEffect(() => {
+  useEffect(() => {
     async function fetchPosts() {
       const response = await fetch('/api/posts?category=Prelims');
       const posts = await response.json();
